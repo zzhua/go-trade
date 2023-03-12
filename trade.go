@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"github.com/markcheno/go-quote"
 	"github.com/markcheno/go-talib"
-	anko_core "github.com/mattn/anko/builtins"
+	anko_core "github.com/mattn/anko/core"
+	"github.com/mattn/anko/env"
 	"github.com/mattn/anko/vm"
 	"math"
 	"os"
@@ -48,7 +49,7 @@ type Strategy struct {
 	sellstop   []float64
 	shortstop  []float64
 	coverstop  []float64
-	env        *vm.Env
+	env        *env.Env
 }
 
 // NewStrategy -
@@ -90,7 +91,7 @@ func (s *Strategy) Backtest(params []float64) float64 {
 
 	starttime := time.Now()
 
-	s.env = vm.NewEnv()
+	s.env = env.NewEnv()
 
 	anko_core.Import(s.env)
 
@@ -115,24 +116,24 @@ func (s *Strategy) Backtest(params []float64) float64 {
 	s.env.Define("SetUnits", s.SetUnits)
 	s.env.Define("Params", params)
 	s.env.Define("Max", math.Max)
-	_, err := s.env.Execute(s.Script)
+	_, err := vm.Execute(s.env, nil, s.Script)
 	if err != nil {
 		panic(err)
 	}
 
 	v, _ := s.env.Get("StartCash")
-	s.Startcash = v.Float()
+	s.Startcash = v.(float64)
 	s.Balance[0] = s.Startcash
 
 	v, _ = s.env.Get("StartBar")
-	s.Startbar = int(v.Int())
+	s.Startbar = int(v.(int64))
 
 	for s.Bar = 0; s.Bar < s.Barcount-1; s.Bar++ {
 		s.Evaluate()
 		if s.Bar >= s.Startbar {
 
 			s.env.Set("Bar", s.Bar)
-			_, err := s.env.Execute("run()")
+			_, err := vm.Execute(s.env, nil, "run()")
 			if err != nil {
 				fmt.Println(err.Error()[9:])
 				os.Exit(0)
